@@ -22,7 +22,6 @@ void FaceSwap::setup_emap() {
 
 bool FaceSwap::Initialize() {
     try {
-
         // 初始化换脸模型
         swap_session_ =
             std::make_unique<Ort::Session>(env_, swap_model_path_.c_str(), session_options_);
@@ -246,35 +245,7 @@ void FaceSwap::Process(cv::Mat target_img, Face &src_face, Face &target_face) {
     cv::Mat latent = cv::Mat(1, 512, CV_32FC1, (void *)source_normed_embedding.data());
     cv::Mat elatent = latent * emap;
     cv::Mat latent_norm = elatent / cv::norm(elatent);
-#if 0
-    // ONNX环境
-    Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "FaceSwap");
-    Ort::SessionOptions session_options;
-    std::unique_ptr<Ort::Session> swap_session;
 
-    swap_session =
-        std::make_unique<Ort::Session>(env, "models/inswapper_128.onnx", session_options);
-
-    // 获取输入输出节点名称
-    Ort::AllocatorWithDefaultOptions allocator;
-
-    std::vector<const char *> swap_input_names_;
-    std::vector<const char *> swap_output_names_;
-
-    std::vector<Ort::AllocatedStringPtr> swap_input_names__;
-    std::vector<Ort::AllocatedStringPtr> swap_output_names__;
-    size_t num_input_nodes = swap_session->GetInputCount();
-    for (size_t i = 0; i < num_input_nodes; i++) {
-        swap_input_names__.push_back(swap_session->GetInputNameAllocated(i, allocator));
-        swap_input_names_.push_back(swap_input_names__.back().get());
-    }
-
-    size_t num_output_nodes = swap_session->GetOutputCount();
-    for (size_t i = 0; i < num_output_nodes; i++) {
-        swap_output_names__.push_back(swap_session->GetOutputNameAllocated(i, allocator));
-        swap_output_names_.push_back(swap_output_names__.back().get());
-    }
-#endif
     auto output_tensors = RunSwapModel(blob, latent_norm);
 
     auto &output_tensor = output_tensors.front();

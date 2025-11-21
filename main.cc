@@ -1,8 +1,7 @@
 #include <iostream>
-
-#include "face_swap.h"
 #include <inspireface.h>
 #include <herror.h>
+#include "face_swap.h"
 
 float source_bbox[] = {660.5451, 174.8821, 927.83734, 528.8127};
 float source_kps[][2] = {{770.26636, 310.94568},
@@ -216,6 +215,7 @@ int main() {
     std::string target_path = "target.jpg";
     // 加载图像
     cv::Mat source_image = cv::imread(source_path);
+
     cv::Mat target_image = cv::imread(target_path);
 
     if (source_image.empty() || target_image.empty()) {
@@ -223,15 +223,28 @@ int main() {
         return -1;
     }
 
-    std::cout << "source cols:" << source_image.cols << " rows:" << source_image.rows << std::endl;
-    std::cout << "target cols:" << target_image.cols << " rows:" << target_image.rows << std::endl;
-#if 0
-    // // 执行换脸
-    cv::Mat result = face_swapper.Process(source_path, target_path, source_image, target_image);
+    Face src_face;
+    src_face.embedding = std::vector(
+        source_embding, source_embding + sizeof(source_embding) / sizeof(source_embding[0]));
 
-    // 保存结果
-    cv::imwrite("result.jpg", result);
-    std::cout << "Face swap completed! Result saved as result.jpg" << std::endl;
-#endif
+    memcpy(src_face.kps, source_kps, 10 * sizeof(float));
+
+    src_face.x1 = source_bbox[0];
+    src_face.y1 = source_bbox[1];
+    src_face.x2 = source_bbox[2];
+    src_face.y2 = source_bbox[3];
+
+    Face target_face;
+    target_face.embedding =
+        std::vector(target_embedding,
+                    target_embedding + sizeof(target_embedding) / sizeof(target_embedding[0]));
+    memcpy(target_face.kps, target_kps, 10 * sizeof(float));
+    target_face.x1 = target_bbox[0];
+    target_face.y1 = target_bbox[1];
+    target_face.x2 = target_bbox[2];
+    target_face.y2 = target_bbox[3];
+
+    face_swapper.Process(target_image, src_face, target_face);
+
     return 0;
 }
