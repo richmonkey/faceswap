@@ -1,14 +1,23 @@
 #pragma once
+
 #include <iostream>
 #include <string>
 #include <vector>
 #include <inspireface.h>
 #include <opencv2/opencv.hpp>
 #include <onnxruntime_cxx_api.h>
+#include <onnxruntime_c_api.h>
+#include <chrono>
 
 class OnnxSession {
   public:
-    OnnxSession(const char *logid) : env_(ORT_LOGGING_LEVEL_WARNING, logid) {}
+    OnnxSession(const char *logid) : env_(ORT_LOGGING_LEVEL_WARNING, logid), logid_(logid) {
+        // https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html
+        std::unordered_map<std::string, std::string> provider_options;
+        provider_options["ModelFormat"] = std::string("NeuralNetwork");
+        provider_options["MLComputeUnits"] = std::string("CPUAndNeuralEngine");
+        session_options_.AppendExecutionProvider("CoreML", provider_options);
+    }
     bool Initialize(const std::string &model_path) {
         try {
             // 初始化换脸模型
@@ -42,9 +51,20 @@ class OnnxSession {
     }
 
     std::vector<Ort::Value> RunModel(std::vector<Ort::Value> &input_tensors) {
+        auto start = std::chrono::steady_clock::now();
         auto output_tensors =
             session_->Run(Ort::RunOptions{nullptr}, input_names_.data(), input_tensors.data(),
                           input_tensors.size(), output_names_.data(), output_names_.size());
+
+        auto end = std::chrono::steady_clock::now();
+
+        // 4. Calculate the duration and count the ticks
+        std::chrono::duration<double, std::milli> duration =
+            end - start; // Duration in milliseconds (floating point)
+
+        // Get the actual number of ticks (milliseconds in this case)
+        double milliseconds = duration.count();
+        std::cout << logid_ << " run model time:" << milliseconds << std::endl;
         return output_tensors;
     }
 
@@ -59,4 +79,6 @@ class OnnxSession {
 
     std::vector<Ort::AllocatedStringPtr> input_names__;
     std::vector<Ort::AllocatedStringPtr> output_names__;
+
+    std::string logid_;
 };

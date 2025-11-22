@@ -2,6 +2,7 @@
 #include <inspireface.h>
 #include <herror.h>
 #include <format>
+#include <chrono>
 #include "face_swap.h"
 #include "face_detect.h"
 #include "face_extract.h"
@@ -36,63 +37,83 @@ int main() {
 
     Face src_face;
     Face dst_face;
-    {
-        std::string source_path = "source.jpg";
-        cv::Mat source_image = cv::imread(source_path);
+    std::string source_path = "source.jpg";
+    cv::Mat source_image = cv::imread(source_path);
 
-        auto results = detect.Process(source_image);
-        for (auto &result : results) {
-            std::cout << std::format("x1:{} y1:{}, x2:{}, y2:{}", result.x1, result.y1, result.x2,
-                                     result.y2)
-                      << std::endl;
-            std::cout << "lmk:" << result.lmk[0] << " " << result.lmk[1] << " " << result.lmk[2]
-                      << " " << result.lmk[3] << std::endl;
-        }
-        if (results.size() == 0) {
-            return 0;
-        }
-        auto &res = results[0];
-
-        float norm = 0;
-        auto embedded = extract.Process(source_image, res.lmk, norm, false);
-        std::cout << "embedded:" << embedded << std::endl;
-
-        src_face.x1 = res.x1;
-        src_face.y1 = res.y1;
-        src_face.x2 = res.x2;
-        src_face.y2 = res.y2;
-        memcpy(src_face.kps, res.lmk, sizeof(float) * 10);
-        src_face.embedding = std::move(embedded);
-    }
     std::string target_path = "target.jpg";
     cv::Mat target_image = cv::imread(target_path);
-    {
 
-        auto results = detect.Process(target_image);
-        for (auto &result : results) {
-            std::cout << std::format("x1:{} y1:{}, x2:{}, y2:{}", result.x1, result.y1, result.x2,
-                                     result.y2)
-                      << std::endl;
-            std::cout << "lmk:" << result.lmk[0] << " " << result.lmk[1] << " " << result.lmk[2]
-                      << " " << result.lmk[3] << std::endl;
+    auto start = std::chrono::steady_clock::now();
+
+    for (int i = 0; i < 100; i++) {
+        {
+
+            auto results = detect.Process(source_image);
+            // for (auto &result : results) {
+            //     std::cout << std::format("x1:{} y1:{}, x2:{}, y2:{}", result.x1, result.y1,
+            //                              result.x2, result.y2)
+            //               << std::endl;
+            //     std::cout << "lmk:" << result.lmk[0] << " " << result.lmk[1] << " " <<
+            //     result.lmk[2]
+            //               << " " << result.lmk[3] << std::endl;
+            // }
+            if (results.size() == 0) {
+                return 0;
+            }
+            auto &res = results[0];
+
+            float norm = 0;
+            auto embedded = extract.Process(source_image, res.lmk, norm, false);
+            // std::cout << "embedded:" << embedded << std::endl;
+
+            src_face.x1 = res.x1;
+            src_face.y1 = res.y1;
+            src_face.x2 = res.x2;
+            src_face.y2 = res.y2;
+            memcpy(src_face.kps, res.lmk, sizeof(float) * 10);
+            src_face.embedding = std::move(embedded);
         }
-        if (results.size() == 0) {
-            return 0;
+
+        {
+
+            auto results = detect.Process(target_image);
+            // for (auto &result : results) {
+            //     std::cout << std::format("x1:{} y1:{}, x2:{}, y2:{}", result.x1, result.y1,
+            //                              result.x2, result.y2)
+            //               << std::endl;
+            //     std::cout << "lmk:" << result.lmk[0] << " " << result.lmk[1] << " " <<
+            //     result.lmk[2]
+            //               << " " << result.lmk[3] << std::endl;
+            // }
+            if (results.size() == 0) {
+                return 0;
+            }
+            auto &res = results[0];
+
+            float norm = 0;
+            auto embedded = extract.Process(target_image, res.lmk, norm, false);
+            // std::cout << "embedded:" << embedded << std::endl;
+
+            dst_face.x1 = res.x1;
+            dst_face.y1 = res.y1;
+            dst_face.x2 = res.x2;
+            dst_face.y2 = res.y2;
+            memcpy(dst_face.kps, res.lmk, sizeof(float) * 10);
+            dst_face.embedding = std::move(embedded);
         }
-        auto &res = results[0];
 
-        float norm = 0;
-        auto embedded = extract.Process(target_image, res.lmk, norm, false);
-        std::cout << "embedded:" << embedded << std::endl;
-
-        dst_face.x1 = res.x1;
-        dst_face.y1 = res.y1;
-        dst_face.x2 = res.x2;
-        dst_face.y2 = res.y2;
-        memcpy(dst_face.kps, res.lmk, sizeof(float) * 10);
-        dst_face.embedding = std::move(embedded);
+        face_swapper.Process(target_image, src_face, dst_face);
     }
 
-    face_swapper.Process(target_image, src_face, dst_face);
+    auto end = std::chrono::steady_clock::now();
+
+    // 4. Calculate the duration and count the ticks
+    std::chrono::duration<double, std::milli> duration =
+        end - start; // Duration in milliseconds (floating point)
+
+    // Get the actual number of ticks (milliseconds in this case)
+    double milliseconds = duration.count();
+
+    std::cout << "fps:" << 100 / (milliseconds / 1000) << std::endl;
     return 0;
 }

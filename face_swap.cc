@@ -1,4 +1,3 @@
-// FaceSwap.cpp
 #include "face_swap.h"
 #include <iostream>
 #include <fstream>
@@ -79,7 +78,6 @@ cv::Mat paste_back_face(const cv::Mat &target_img, const cv::Mat &bgr_fake1, con
     }
     fake_diff /= channels.size();
 
-    std::cout << "fake diff rows:" << fake_diff.rows << " cols:" << fake_diff.cols << std::endl;
     // 边界置0
     fake_diff.rowRange(0, 2).setTo(0);
     fake_diff.rowRange(fake_diff.rows - 2, fake_diff.rows).setTo(0);
@@ -144,7 +142,7 @@ cv::Mat paste_back_face(const cv::Mat &target_img, const cv::Mat &bgr_fake1, con
 
     cv::Mat result;
     fake_merged.convertTo(result, CV_8UC3);
-    cv::imwrite("merge.jpg", result);
+    // cv::imwrite("merge.jpg", result);
     return result;
 }
 
