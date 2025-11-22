@@ -142,7 +142,7 @@ cv::Mat paste_back_face(const cv::Mat &target_img, const cv::Mat &bgr_fake1, con
 
     cv::Mat result;
     fake_merged.convertTo(result, CV_8UC3);
-    // cv::imwrite("merge.jpg", result);
+    cv::imwrite("merge.jpg", result);
     return result;
 }
 

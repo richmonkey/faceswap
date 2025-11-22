@@ -16,6 +16,34 @@ template <typename T> std::ostream &operator<<(std::ostream &os, const std::vect
     return os;
 }
 
+bool detect_face(FaceDetect &detect, FaceExtract &extract, cv::Mat &image, Face &src_face) {
+    auto results = detect.Process(image);
+    // for (auto &result : results) {
+    //     std::cout << std::format("x1:{} y1:{}, x2:{}, y2:{}", result.x1, result.y1,
+    //                              result.x2, result.y2)
+    //               << std::endl;
+    //     std::cout << "lmk:" << result.lmk[0] << " " << result.lmk[1] << " " <<
+    //     result.lmk[2]
+    //               << " " << result.lmk[3] << std::endl;
+    // }
+    if (results.size() == 0) {
+        return false;
+    }
+    auto &res = results[0];
+
+    float norm = 0;
+    auto embedded = extract.Process(image, res.lmk, norm, false);
+    // std::cout << "embedded:" << embedded << std::endl;
+
+    src_face.x1 = res.x1;
+    src_face.y1 = res.y1;
+    src_face.x2 = res.x2;
+    src_face.y2 = res.y2;
+    memcpy(src_face.kps, res.lmk, sizeof(float) * 10);
+    src_face.embedding = std::move(embedded);
+    return true;
+}
+
 int main() {
     FaceDetect detect(640);
     if (!detect.Initialize("models/buffalo_l/det_10g.onnx")) {
@@ -35,8 +63,6 @@ int main() {
         return -1;
     }
 
-    Face src_face;
-    Face dst_face;
     std::string source_path = "source.jpg";
     cv::Mat source_image = cv::imread(source_path);
 
@@ -45,63 +71,17 @@ int main() {
 
     auto start = std::chrono::steady_clock::now();
 
-    for (int i = 0; i < 100; i++) {
-        {
-
-            auto results = detect.Process(source_image);
-            // for (auto &result : results) {
-            //     std::cout << std::format("x1:{} y1:{}, x2:{}, y2:{}", result.x1, result.y1,
-            //                              result.x2, result.y2)
-            //               << std::endl;
-            //     std::cout << "lmk:" << result.lmk[0] << " " << result.lmk[1] << " " <<
-            //     result.lmk[2]
-            //               << " " << result.lmk[3] << std::endl;
-            // }
-            if (results.size() == 0) {
-                return 0;
-            }
-            auto &res = results[0];
-
-            float norm = 0;
-            auto embedded = extract.Process(source_image, res.lmk, norm, false);
-            // std::cout << "embedded:" << embedded << std::endl;
-
-            src_face.x1 = res.x1;
-            src_face.y1 = res.y1;
-            src_face.x2 = res.x2;
-            src_face.y2 = res.y2;
-            memcpy(src_face.kps, res.lmk, sizeof(float) * 10);
-            src_face.embedding = std::move(embedded);
+    const int COUNT = 1;
+    for (int i = 0; i < COUNT; i++) {
+        Face src_face;
+        Face dst_face;
+        if (!detect_face(detect, extract, source_image, src_face)) {
+            return 0;
         }
 
-        {
-
-            auto results = detect.Process(target_image);
-            // for (auto &result : results) {
-            //     std::cout << std::format("x1:{} y1:{}, x2:{}, y2:{}", result.x1, result.y1,
-            //                              result.x2, result.y2)
-            //               << std::endl;
-            //     std::cout << "lmk:" << result.lmk[0] << " " << result.lmk[1] << " " <<
-            //     result.lmk[2]
-            //               << " " << result.lmk[3] << std::endl;
-            // }
-            if (results.size() == 0) {
-                return 0;
-            }
-            auto &res = results[0];
-
-            float norm = 0;
-            auto embedded = extract.Process(target_image, res.lmk, norm, false);
-            // std::cout << "embedded:" << embedded << std::endl;
-
-            dst_face.x1 = res.x1;
-            dst_face.y1 = res.y1;
-            dst_face.x2 = res.x2;
-            dst_face.y2 = res.y2;
-            memcpy(dst_face.kps, res.lmk, sizeof(float) * 10);
-            dst_face.embedding = std::move(embedded);
+        if (!detect_face(detect, extract, target_image, dst_face)) {
+            return 0;
         }
-
         face_swapper.Process(target_image, src_face, dst_face);
     }
 
@@ -114,6 +94,6 @@ int main() {
     // Get the actual number of ticks (milliseconds in this case)
     double milliseconds = duration.count();
 
-    std::cout << "fps:" << 100 / (milliseconds / 1000) << std::endl;
+    std::cout << "fps:" << COUNT / (milliseconds / 1000) << std::endl;
     return 0;
 }
