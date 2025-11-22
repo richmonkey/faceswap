@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <memory>
+#include "onnx_session.h"
 
 class Face {
   public:
@@ -18,10 +19,10 @@ class Face {
 
 class FaceSwap {
   public:
-    FaceSwap(const std::string &swap_model_path);
+    FaceSwap();
     ~FaceSwap();
 
-    bool Initialize();
+    bool Initialize(const std::string &model_path);
     void Process(cv::Mat target_img, Face &src_face, Face &target_face);
 
   private:
@@ -29,18 +30,7 @@ class FaceSwap {
 
     void setup_emap();
 
-    std::string swap_model_path_;
-
-    // ONNX环境
-    Ort::Env env_;
-    Ort::SessionOptions session_options_;
-    std::unique_ptr<Ort::Session> swap_session_;
-
-    std::vector<const char *> swap_input_names_;
-    std::vector<const char *> swap_output_names_;
-
-    std::vector<Ort::AllocatedStringPtr> swap_input_names__;
-    std::vector<Ort::AllocatedStringPtr> swap_output_names__;
+    OnnxSession onnx_;
 
     cv::Mat emap_;
 };

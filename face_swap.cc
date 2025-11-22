@@ -9,9 +9,9 @@
 #include <xtensor/views/xview.hpp>
 #include <xtensor.hpp>
 #include "emap_loader.h"
+#include "face_align.h"
 
-FaceSwap::FaceSwap(const std::string &swap_model_path)
-    : env_(ORT_LOGGING_LEVEL_WARNING, "FaceSwap"), swap_model_path_(swap_model_path) {}
+FaceSwap::FaceSwap() : onnx_("FaceSwap") {}
 
 FaceSwap::~FaceSwap() {}
 
@@ -20,45 +20,14 @@ void FaceSwap::setup_emap() {
     std::cout << "emap size:" << emap_.size << emap_.at<float>(0, 0) << std::endl;
 }
 
-bool FaceSwap::Initialize() {
-    try {
-        // 初始化换脸模型
-        swap_session_ =
-            std::make_unique<Ort::Session>(env_, swap_model_path_.c_str(), session_options_);
-
-        // 获取输入输出节点名称
-        Ort::AllocatorWithDefaultOptions allocator;
-
-        // 换脸模型节点
-        size_t num_input_nodes = swap_session_->GetInputCount();
-        for (size_t i = 0; i < num_input_nodes; i++) {
-            swap_input_names__.push_back(swap_session_->GetInputNameAllocated(i, allocator));
-            swap_input_names_.push_back(swap_input_names__.back().get());
-        }
-
-        size_t num_output_nodes = swap_session_->GetOutputCount();
-        for (size_t i = 0; i < num_output_nodes; i++) {
-            swap_output_names__.push_back(swap_session_->GetOutputNameAllocated(i, allocator));
-            swap_output_names_.push_back(swap_output_names__.back().get());
-        }
-
-        setup_emap();
-        std::cout << "Models initialized successfully!" << std::endl;
-
-        return true;
-
-    } catch (const std::exception &e) {
-        std::cerr << "Failed to initialize models: " << e.what() << std::endl;
+bool FaceSwap::Initialize(const std::string &model_path) {
+    if (!onnx_.Initialize(model_path)) {
         return false;
     }
-}
 
-// similarity transform destination points
-const std::vector<cv::Point2f> SIMILARITY_TRANSFORM_DEST = {{38.2946, 51.6963},
-                                                            {73.5318, 51.5014},
-                                                            {56.0252, 71.7366},
-                                                            {41.5493, 92.3655},
-                                                            {70.7299, 92.2041}};
+    setup_emap();
+    return true;
+}
 
 float embedding_norm(std::vector<float> &embedded) {
     float mse = 0.0f;
@@ -202,19 +171,14 @@ std::vector<Ort::Value> FaceSwap::RunSwapModel(cv::Mat &blob, cv::Mat &latent_no
     input_tensors.push_back(std::move(source_input_tensor));
     input_tensors.push_back(std::move(target_input_tensor));
 
-    // 执行推理
-    auto output_tensors = swap_session_->Run(Ort::RunOptions{nullptr}, swap_input_names_.data(),
-                                             input_tensors.data(), input_tensors.size(),
-                                             swap_output_names_.data(), swap_output_names_.size());
-    return output_tensors;
+    return onnx_.RunModel(input_tensors);
 }
 
 void FaceSwap::Process(cv::Mat target_img, Face &src_face, Face &target_face) {
+    cv::Mat cvaimg;
+    cv::Mat M = norm_crop(target_img, target_face.kps, 128, cvaimg);
+#if 0
     std::vector<cv::Point2f> pointsFive;
-
-    std::vector<float> source_normed_embedding = src_face.embedding;
-
-    normed_embedding(source_normed_embedding);
 
     for (size_t i = 0; i < 5; i++) {
         pointsFive.push_back(cv::Point2f(target_face.kps[i * 2], target_face.kps[i * 2 + 1]));
@@ -232,6 +196,7 @@ void FaceSwap::Process(cv::Mat target_img, Face &src_face, Face &target_face) {
     cv::Size target_size(128, 128);
     cv::warpAffine(target_img, cvaimg, M, target_size, cv::INTER_LINEAR, cv::BORDER_CONSTANT,
                    cv::Scalar(0, 0, 0));
+#endif
 
     // Define parameters for blobFromImage
     double scalefactor = 1.0 / 255.0;      // Scale pixel values to [0, 1]
@@ -241,9 +206,11 @@ void FaceSwap::Process(cv::Mat target_img, Face &src_face, Face &target_face) {
 
     // Create the 4D blob
     cv::Mat blob = cv::dnn::blobFromImage(cvaimg, scalefactor, size, mean, swapRB);
-    auto emap = EmapLoader::loadFromBinary("emap.bin");
+
+    std::vector<float> source_normed_embedding = src_face.embedding;
+    normed_embedding(source_normed_embedding);
     cv::Mat latent = cv::Mat(1, 512, CV_32FC1, (void *)source_normed_embedding.data());
-    cv::Mat elatent = latent * emap;
+    cv::Mat elatent = latent * emap_;
     cv::Mat latent_norm = elatent / cv::norm(elatent);
 
     auto output_tensors = RunSwapModel(blob, latent_norm);
