@@ -26,7 +26,7 @@ class FaceSwap {
     void Process(cv::Mat target_img, Face &src_face, Face &target_face);
 
   private:
-    std::vector<Ort::Value> RunSwapModel(cv::Mat &blob, cv::Mat &latent_norm);
+    std::vector<Ort::Value> RunModel(cv::Mat &blob, cv::Mat &latent_norm);
 
     void setup_emap();
 

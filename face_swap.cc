@@ -148,7 +148,7 @@ cv::Mat paste_back_face(const cv::Mat &target_img, const cv::Mat &bgr_fake1, con
     return result;
 }
 
-std::vector<Ort::Value> FaceSwap::RunSwapModel(cv::Mat &blob, cv::Mat &latent_norm) {
+std::vector<Ort::Value> FaceSwap::RunModel(cv::Mat &blob, cv::Mat &latent_norm) {
     // 准备输入tensor
     std::vector<int64_t> input_shape = {1, 3, 128, 128}; // 根据模型调整
 
@@ -177,26 +177,6 @@ std::vector<Ort::Value> FaceSwap::RunSwapModel(cv::Mat &blob, cv::Mat &latent_no
 void FaceSwap::Process(cv::Mat target_img, Face &src_face, Face &target_face) {
     cv::Mat cvaimg;
     cv::Mat M = norm_crop(target_img, target_face.kps, 128, cvaimg);
-#if 0
-    std::vector<cv::Point2f> pointsFive;
-
-    for (size_t i = 0; i < 5; i++) {
-        pointsFive.push_back(cv::Point2f(target_face.kps[i * 2], target_face.kps[i * 2 + 1]));
-    }
-
-    std::vector<cv::Point2f> dst(SIMILARITY_TRANSFORM_DEST);
-    auto diff_x = (128.0 / 128.0) * 8.0;
-    for (auto &d : dst) {
-        d.x = d.x + diff_x;
-    }
-
-    cv::Mat inliers;
-    cv::Mat M = cv::estimateAffinePartial2D(pointsFive, dst, inliers, cv::LMEDS, 3.0);
-    cv::Mat cvaimg = cv::Mat::zeros(128, 128, target_img.type());
-    cv::Size target_size(128, 128);
-    cv::warpAffine(target_img, cvaimg, M, target_size, cv::INTER_LINEAR, cv::BORDER_CONSTANT,
-                   cv::Scalar(0, 0, 0));
-#endif
 
     // Define parameters for blobFromImage
     double scalefactor = 1.0 / 255.0;      // Scale pixel values to [0, 1]
@@ -213,7 +193,7 @@ void FaceSwap::Process(cv::Mat target_img, Face &src_face, Face &target_face) {
     cv::Mat elatent = latent * emap_;
     cv::Mat latent_norm = elatent / cv::norm(elatent);
 
-    auto output_tensors = RunSwapModel(blob, latent_norm);
+    auto output_tensors = RunModel(blob, latent_norm);
 
     auto &output_tensor = output_tensors.front();
     Ort::TensorTypeAndShapeInfo shape_info = output_tensor.GetTensorTypeAndShapeInfo();
